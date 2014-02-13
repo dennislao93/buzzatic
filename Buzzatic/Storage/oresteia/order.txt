@@ -1,0 +1,3 @@
+agamemnon.txt ~ Agamemnon
+thelibationbearers.txt ~ The Libation Bearers
+theeumenides.txt ~ The Eumenides
