@@ -1,4 +1,5 @@
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.PrintWriter;
@@ -9,65 +10,128 @@ import java.util.regex.Pattern;
 
 
 public class KingLear {
-	
+
 	private static HashSet<String> charaNames;
+	private static HashSet<String> stageDirs;
+	private static ArrayList<String> lines;
 
 	public static void main(String[] args) throws IOException {
-		BufferedReader reader = new BufferedReader(new FileReader(args[0]));
-		String line;
-		ArrayList<String> lines = new ArrayList<String>();
-		while ((line = reader.readLine()) != null) {
-			lines.add(line);
+		// Directory path here
+		String path = ".";
+		String files;
+		File folder = new File(path);
+		File[] listOfFiles = folder.listFiles();
+		ArrayList<File> filelist=new ArrayList<File>();
+		for (int i = 0; i < listOfFiles.length; i++) {
+			if (listOfFiles[i].isFile()) {
+				files = listOfFiles[i].getName();
+				if (files.endsWith(".txt") || files.endsWith(".TXT")) {
+					filelist.add(listOfFiles[i]);
+				}
+			}
 		}
-		charaNames = getCharaNames(lines);
-		reader.close();
-		PrintWriter writer = new PrintWriter("edited_" + args[0]);
-		for (String s: lines) {
-			writer.println(process(s));
+
+		for (File f: filelist) {
+			BufferedReader reader = new BufferedReader(new FileReader(f));
+			String line;
+			lines = new ArrayList<String>();
+			while ((line = reader.readLine()) != null) {
+				lines.add(line);
+			}
+			reader.close();
+			System.out.println("\n" + lines.get(0));
+			charaNames = new HashSet<String>();
+			stageDirs = new HashSet<String>();
+			getCharaNames();
+			getStageDirs();
+			PrintWriter writer = new PrintWriter(f);
+			for (String s: lines) {
+				writer.println(process(s));
+			}
+			writer.close();
 		}
-		writer.close();
 	}
 
 	private static Pattern pattern;
 	private static Matcher matcher;
 	private static String helperString;
 	private static String helperArr[];
-	private static HashSet<String> getCharaNames(ArrayList<String> lines) {
-		HashSet<String> charaNames = new HashSet<String>();
+	private static void getCharaNames() {
 		for (String s: lines) {
 			if (s.matches(".*Enter[,]?\\s[^,]+(,\\s[^,]*)*")) {
 				helperString = s.substring(s.indexOf("Enter") + 6);
-				addCharas(charaNames);
+				addCharas();
 			} else if (s.matches(".*Exit[,]?\\s[^,]+(,\\s[^,]*)*")) {
 				helperString = s.substring(s.indexOf("Exit") + 5);
-				addCharas(charaNames);
+				addCharas();
 			} else if (s.matches(".*Exeunt[,]?\\s[^,]+(,\\s[^,]*)*")) {
 				helperString = s.substring(s.indexOf("Exeunt") + 7);
-				addCharas(charaNames);
+				addCharas();
 			} else if (s.matches(".*Re-enter[,]?\\s[^,]+(,\\s[^,]*)*.*")) {
 				helperString = s.substring(s.indexOf("Re-enter") + 9);
-				addCharas(charaNames);
+				addCharas();
+			} else if (s.matches("[A-Z]+(\\s[A-Z]+)*")) {
+				helperString = s.trim();
+				addCharas();
 			}
 		}
 		System.out.println("recognized characters:");
 		for (String cn: charaNames) {
 			System.out.println(cn);
 		}
-		return charaNames;
 	}
 
-	private static void addCharas(HashSet<String> charaNames) {
+	private static void addCharas() {
 		pattern = Pattern.compile("[^,]+(,\\s[^,]*)*");
 		matcher = pattern.matcher(helperString);
 		matcher.find();
 		helperString = matcher.group();
 		helperArr = helperString.split(",");
 		for (String s1: helperArr) {
-			if (s1.indexOf("and") != -1) {
-				charaNames.add(s1.replace("and", "").trim());
-			} else {
-				charaNames.add(s1.trim());
+			s1 = s1.trim();
+			for (String s2: s1.split("and")) {
+				s2 = s2.trim();
+				if (!s2.equals("")) {
+					if (s2.matches("[a-zA-Z][a-z]*(\\s[a-zA-Z][a-z]+)*")) {
+						if (s2.split("\\s")[s2.split("\\s").length - 1].trim().matches("[a-zA-Z]+[s]")) {
+							charaNames.add(s2.split("\\s")[s2.split("\\s").length - 1].trim().substring(0, s2.split("\\s")[s2.split("\\s").length - 1].trim().length() - 1));
+						} else {
+							charaNames.add(s2.split("\\s")[s2.split("\\s").length - 1].trim());
+						}
+					} else {
+						charaNames.add(s2.trim());
+					}
+				}
 			}
+		}
+	}
+
+	private static int lineIndex;
+	private static boolean nextLineIsBlank;
+	private static char testLinePunct;
+	private static void getStageDirs() {
+		for (String line: lines) {
+			if (line.matches(".*Enter[,]?\\s[^,]+(,\\s[^,]*)*.*") || line.matches(".*Exit[,]?(\\s[^,]+(,\\s[^,]*)*)?.*") || line.matches(".*Exeunt[,]?(\\s[^,]+(,\\s[^,]*)*)?.*") || line.matches(".*Re-enter[,]?\\s[^,]+(,\\s[^,]*)*.*")) {
+				stageDirs.add(line);
+			}
+		}
+		nextLineIsBlank = false;
+		for (lineIndex = lines.size() - 1; lineIndex >= 1; lineIndex--) {
+			if (lines.get(lineIndex).length() == 0) {
+				nextLineIsBlank = true;
+			} else {
+				if (nextLineIsBlank) {
+					testLinePunct = lines.get(lineIndex).charAt(lines.get(lineIndex).length() - 1);
+					if (testLinePunct >= 'a' && testLinePunct <= 'z' || testLinePunct >= 'A' && testLinePunct <= 'Z') {
+						stageDirs.add(lines.get(lineIndex));
+					}
+				}
+				nextLineIsBlank = false;
+			}
+		}
+		System.out.println("Recognized stage directions:");
+		for (String stageDir: stageDirs) {
+			System.out.println(stageDir);
 		}
 	}
 
@@ -86,8 +150,10 @@ public class KingLear {
 	}
 
 	private static boolean checkStageDir(String line) {
-		if (line.matches(".*Enter[,]?\\s[^,]+(,\\s[^,]*)*.*") || line.matches(".*Exit[,]?(\\s[^,]+(,\\s[^,]*)*)?.*") || line.matches(".*Exeunt[,]?(\\s[^,]+(,\\s[^,]*)*)?.*") || line.matches(".*Re-enter[,]?\\s[^,]+(,\\s[^,]*)*.*")) {
-			return true;
+		for (String stageDir: stageDirs) {
+			if (line.equals(stageDir)) {
+				return true;
+			}
 		}
 		return false;
 	}
